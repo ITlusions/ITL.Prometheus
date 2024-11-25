@@ -3340,13 +3340,15 @@ prometheus:
   #     someoneelse:$apr1$DMZX2Z4q$6SbQIfyuLQd.xmo/P0m2c.
 
   ingress:
-    enabled: false
+    enabled: true
 
     # For Kubernetes >= 1.18 you should specify the ingress-controller via the field ingressClassName
     # See https://kubernetes.io/blog/2020/04/02/improvements-to-the-ingress-api-in-kubernetes-1.18/#specifying-the-class-of-an-ingress
-    # ingressClassName: nginx
+    ingressClassName: traefik
 
-    annotations: {}
+    annotations:
+      traefik.ingress.kubernetes.io/router.entrypoints: web, websecure  # Specify entry points
+      cert-manager.io/cluster-issuer: "letsencrypt-issuer"
     labels: {}
 
     ## Redirect ingress to an additional defined port on the service
@@ -3357,7 +3359,8 @@ prometheus:
     ##
     # hosts:
     #   - prometheus.domain.com
-    hosts: []
+    hosts: 
+      - prometheus.dev.itlusions.com
 
     ## Paths to use for ingress rules - one path should match the prometheusSpec.routePrefix
     ##
@@ -3371,10 +3374,10 @@ prometheus:
     ## TLS configuration for Prometheus Ingress
     ## Secret must be manually created in the namespace
     ##
-    tls: []
-      # - secretName: prometheus-general-tls
-      #   hosts:
-      #     - prometheus.example.com
+    tls:
+      - secretName: prometheus-dev-itlusions-com-tls
+        hosts:
+          - prometheus.dev.itlusions.com
 
   # -- BETA: Configure the gateway routes for the chart here.
   # More routes can be added by adding a dictionary key like the 'main' route.
