@@ -993,7 +993,7 @@ kube-prometheus-stack:
   ## Using default values from https://github.com/grafana/helm-charts/blob/main/charts/grafana/values.yaml
   ##
   grafana:
-    enabled: false
+    enabled: true
     namespaceOverride: ""
 
     ## ForceDeployDatasources Create datasource configmap even if grafana deployment has been disabled
@@ -1027,18 +1027,17 @@ kube-prometheus-stack:
     ingress:
       ## If true, Grafana Ingress will be created
       ##
-      enabled: false
+      enabled: true
 
       ## IngressClassName for Grafana Ingress.
       ## Should be provided if Ingress is enable.
       ##
-      # ingressClassName: nginx
+      ingressClassName: traefik
 
-      ## Annotations for Grafana Ingress
-      ##
-      annotations: {}
-        # kubernetes.io/ingress.class: nginx
-        # kubernetes.io/tls-acme: "true"
+      annotations:
+        traefik.ingress.kubernetes.io/router.entrypoints: web, websecure  # Specify entry points
+        traefik.ingress.kubernetes.io/router.middlewares: traefik-acl@kubernetescrd
+        cert-manager.io/cluster-issuer: "letsencrypt-issuer"
 
       ## Labels to be added to the Ingress
       ##
@@ -1049,7 +1048,8 @@ kube-prometheus-stack:
       ##
       # hosts:
       #   - grafana.domain.com
-      hosts: []
+      hosts:
+        - grafana.dev.itlusions.com
 
       ## Path for grafana ingress
       path: /
@@ -1057,10 +1057,10 @@ kube-prometheus-stack:
       ## TLS configuration for grafana Ingress
       ## Secret must be manually created in the namespace
       ##
-      tls: []
-      # - secretName: grafana-general-tls
-      #   hosts:
-      #   - grafana.example.com
+      tls:
+      - secretName: grafana-dev-itlusions-com-tls
+        hosts:
+        - grafana.dev.itlusions.com
 
     # # To make Grafana persistent (Using Statefulset)
     # #
