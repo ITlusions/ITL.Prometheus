@@ -3349,6 +3349,7 @@ kube-prometheus-stack:
 
       annotations:
         traefik.ingress.kubernetes.io/router.entrypoints: web, websecure  # Specify entry points
+        traefik.ingress.kubernetes.io/router.middlewares: traefik-acl@kubernetescrd
         cert-manager.io/cluster-issuer: "letsencrypt-issuer"
       labels: {}
 
