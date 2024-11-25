@@ -1109,7 +1109,7 @@ kube-prometheus-stack:
 
         ## URL of prometheus datasource
         ##
-        # url: http://prometheus-stack-prometheus:9090/
+        url: https://prometheus.dev.itlusions.com/
 
         ## Prometheus request timeout in seconds
         # timeout: 30
