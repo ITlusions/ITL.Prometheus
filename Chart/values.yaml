@@ -1070,7 +1070,7 @@ kube-prometheus-stack:
        storageClassName: "openebs-hostpath"
        accessModes:
          - ReadWriteOnce
-       size: 20Gi
+       size: 10Gi
        finalizers:
          - kubernetes.io/pvc-protection
 
