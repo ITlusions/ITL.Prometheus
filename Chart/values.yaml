@@ -1064,15 +1064,15 @@ kube-prometheus-stack:
 
     # # To make Grafana persistent (Using Statefulset)
     # #
-      persistence:
-       enabled: true
-       type: sts
-       storageClassName: "openebs-hostpath"
-       accessModes:
-         - ReadWriteOnce
-       size: 10Gi
-       finalizers:
-         - kubernetes.io/pvc-protection
+    persistence:
+      enabled: true
+      type: sts
+      storageClassName: "openebs-hostpath"
+      accessModes:
+        - ReadWriteOnce
+      size: 10Gi
+      finalizers:
+        - kubernetes.io/pvc-protection
 
     serviceAccount:
       create: true
