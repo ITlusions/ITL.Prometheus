@@ -1347,7 +1347,7 @@ grafana:
   # #
   persistence:
     enabled: true
-    type: sts
+    type: pvc
     storageClassName: "ha-dbs-lh"
     accessModes:
       - ReadWriteOnce
