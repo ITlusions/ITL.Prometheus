@@ -4332,16 +4332,15 @@ prometheus:
     ## ref: https://github.com/prometheus-operator/prometheus-operator/blob/main/Documentation/platform/storage.md
     ##
     storageSpec:
-    ## Using PersistentVolumeClaim
-    ##
-     volumeClaimTemplate:
-       spec:
-         storageClassName: ha-dbs-lh
-         accessModes: ["ReadWriteOnce"]
-         resources:
-           requests:
-             storage: 10Gi
-         selector: {}
+      ## Using PersistentVolumeClaim
+      ##
+      volumeClaimTemplate:
+        spec:
+          storageClassName: ha-dbs-lh
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 10Gi
 
     ## Using tmpfs volume
     ##
