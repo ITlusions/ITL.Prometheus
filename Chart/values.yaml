@@ -1022,7 +1022,7 @@ kube-prometheus-stack:
       storage:
         volumeClaimTemplate:
           spec:
-            storageClassName: ha-grafana-block
+            storageClassName: ha-gen-lh
             accessModes: ["ReadWriteOnce"]
             resources:
               requests:
@@ -1348,7 +1348,7 @@ kube-prometheus-stack:
     persistence:
       enabled: true
       type: pvc
-      storageClassName: "ha-grafana-block"
+      storageClassName: "ha-gen-lh"
       accessModes:
         - ReadWriteOnce
       size: 10Gi
@@ -4336,7 +4336,7 @@ kube-prometheus-stack:
         ##
         volumeClaimTemplate:
           spec:
-            storageClassName: "ha-grafana-block"
+            storageClassName: "ha-gen-lh"
             accessModes: ["ReadWriteOnce"]
             resources:
               requests:
