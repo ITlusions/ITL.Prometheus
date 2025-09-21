@@ -1,0 +1,619 @@
+# Production Configuration for ITL Prometheus Stack
+# This configuration is optimized for production environments with:
+# - High availability setup
+# - Proper resource allocation
+# - Security hardening
+# - Extended retention periods
+# - External access configuration
+
+kube-prometheus-stack:
+  # Global configuration
+  fullnameOverride: "itl-prometheus"
+  
+  commonLabels:
+    environment: "production"
+    team: "platform"
+  
+  # CRD management with upgrade job
+  crds:
+    enabled: true
+    upgradeJob:
+      enabled: true
+      forceConflicts: false
+  
+  # Prometheus configuration
+  prometheus:
+    enabled: true
+    
+    # Ingress for external access
+    ingress:
+      enabled: true
+      ingressClassName: "nginx"
+      annotations:
+        nginx.ingress.kubernetes.io/ssl-redirect: "true"
+        cert-manager.io/cluster-issuer: "letsencrypt-prod"
+      hosts:
+        - prometheus.yourdomain.com
+      tls:
+        - secretName: prometheus-tls
+          hosts:
+            - prometheus.yourdomain.com
+    
+    # Service configuration
+    service:
+      type: ClusterIP
+      port: 9090
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+    
+    # ServiceMonitor for self-monitoring
+    serviceMonitor:
+      selfMonitor: true
+      interval: 30s
+    
+    prometheusSpec:
+      # Image configuration
+      image:
+        registry: quay.io
+        repository: prometheus/prometheus
+        tag: ""  # Use chart default
+      
+      # Replica configuration for HA
+      replicas: 2
+      shards: 1
+      
+      # Data retention for production
+      retention: 30d
+      retentionSize: "180GB"  # Leave buffer space
+      
+      # Resource allocation
+      resources:
+        requests:
+          memory: 4Gi
+          cpu: 2000m
+        limits:
+          memory: 8Gi
+          cpu: 4000m
+      
+      # Storage configuration
+      storageSpec:
+        volumeClaimTemplate:
+          spec:
+            storageClassName: "ha-gen-lh"
+            accessModes: ["ReadWriteOnce"]
+            resources:
+              requests:
+                storage: 200Gi
+      
+      # High availability configuration
+      podAntiAffinity: "hard"
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: prometheus
+            topologyKey: kubernetes.io/hostname
+      
+      # Node selection for dedicated monitoring nodes
+      nodeSelector:
+        node-role: monitoring
+      
+      # Tolerations for dedicated monitoring nodes
+      tolerations:
+        - key: "monitoring"
+          operator: "Equal"
+          value: "true"
+          effect: "NoSchedule"
+      
+      # Security context
+      securityContext:
+        runAsGroup: 2000
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 2000
+        seccompProfile:
+          type: RuntimeDefault
+      
+      # Query configuration
+      query:
+        timeout: 2m
+        maxConcurrency: 20
+        maxSamples: 50000000
+      
+      # TSDB configuration
+      tsdb:
+        outOfOrderTimeWindow: 0s
+      
+      # WAL compression
+      walCompression: true
+      
+      # Service discovery configuration
+      serviceMonitorSelectorNilUsesHelmValues: true
+      podMonitorSelectorNilUsesHelmValues: true
+      ruleSelectorNilUsesHelmValues: true
+      
+      # Namespace selectors (allow all namespaces)
+      serviceMonitorNamespaceSelector: {}
+      podMonitorNamespaceSelector: {}
+      ruleNamespaceSelector: {}
+      
+      # Remote write for backup/federation
+      remoteWrite:
+        - url: "https://remote-prometheus.yourdomain.com/api/v1/write"
+          writeRelabelConfigs:
+            - sourceLabels: [__name__]
+              regex: "prometheus_notifications_.*"
+              action: drop
+            - sourceLabels: [__name__]
+              regex: "prometheus_config_.*"
+              action: drop
+      
+      # External labels for federation
+      externalLabels:
+        cluster: "production"
+        region: "us-east-1"
+      
+      # Additional scrape configs for external services
+      additionalScrapeConfigs:
+        - job_name: 'external-services'
+          static_configs:
+            - targets: ['external-service.yourdomain.com:9090']
+          scrape_interval: 60s
+          metrics_path: /metrics
+  
+  # Alertmanager configuration
+  alertmanager:
+    enabled: true
+    
+    # Ingress for external access
+    ingress:
+      enabled: true
+      ingressClassName: "nginx"
+      annotations:
+        nginx.ingress.kubernetes.io/ssl-redirect: "true"
+        cert-manager.io/cluster-issuer: "letsencrypt-prod"
+      hosts:
+        - alertmanager.yourdomain.com
+      tls:
+        - secretName: alertmanager-tls
+          hosts:
+            - alertmanager.yourdomain.com
+    
+    alertmanagerSpec:
+      # Image configuration
+      image:
+        registry: quay.io
+        repository: prometheus/alertmanager
+        tag: ""  # Use chart default
+      
+      # Replica configuration for HA
+      replicas: 3
+      
+      # Data retention
+      retention: 120h
+      
+      # Resource allocation
+      resources:
+        requests:
+          memory: 512Mi
+          cpu: 200m
+        limits:
+          memory: 1Gi
+          cpu: 500m
+      
+      # Storage configuration
+      storage:
+        volumeClaimTemplate:
+          spec:
+            storageClassName: "ha-gen-lh"
+            accessModes: ["ReadWriteOnce"]
+            resources:
+              requests:
+                storage: 20Gi
+      
+      # High availability configuration
+      podAntiAffinity: "soft"
+      
+      # Node selection
+      nodeSelector:
+        node-role: monitoring
+      
+      # Tolerations
+      tolerations:
+        - key: "monitoring"
+          operator: "Equal"
+          value: "true"
+          effect: "NoSchedule"
+      
+      # Security context
+      securityContext:
+        runAsGroup: 2000
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 2000
+        seccompProfile:
+          type: RuntimeDefault
+    
+    # Alertmanager configuration
+    config:
+      global:
+        resolve_timeout: 5m
+        smtp_smarthost: 'smtp.yourdomain.com:587'
+        smtp_from: 'alerts@yourdomain.com'
+        smtp_auth_username: 'alerts@yourdomain.com'
+        smtp_auth_password: 'your-smtp-password'
+        smtp_require_tls: true
+      
+      # Inhibition rules
+      inhibit_rules:
+        - source_matchers:
+            - 'severity = critical'
+          target_matchers:
+            - 'severity =~ warning|info'
+          equal:
+            - 'namespace'
+            - 'alertname'
+        - source_matchers:
+            - 'severity = warning'
+          target_matchers:
+            - 'severity = info'
+          equal:
+            - 'namespace'
+            - 'alertname'
+      
+      # Routing configuration
+      route:
+        group_by: ['namespace', 'alertname']
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 12h
+        receiver: 'default'
+        routes:
+          - receiver: 'critical'
+            matchers:
+              - severity = "critical"
+            group_wait: 10s
+            repeat_interval: 5m
+          - receiver: 'warning'
+            matchers:
+              - severity = "warning"
+            group_wait: 30s
+            repeat_interval: 1h
+          - receiver: 'null'
+            matchers:
+              - alertname = "Watchdog"
+      
+      # Receivers
+      receivers:
+        - name: 'null'
+        
+        - name: 'default'
+          email_configs:
+            - to: 'platform-team@yourdomain.com'
+              subject: '[ALERT] {{ .GroupLabels.alertname }} in {{ .GroupLabels.namespace }}'
+              body: |
+                {{ range .Alerts }}
+                **Alert:** {{ .Annotations.summary }}
+                **Description:** {{ .Annotations.description }}
+                **Severity:** {{ .Labels.severity }}
+                **Namespace:** {{ .Labels.namespace }}
+                **Time:** {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+                {{ end }}
+        
+        - name: 'critical'
+          email_configs:
+            - to: 'platform-oncall@yourdomain.com'
+              subject: '[CRITICAL] {{ .GroupLabels.alertname }}'
+              body: |
+                🚨 **CRITICAL ALERT** 🚨
+                
+                {{ range .Alerts }}
+                **Alert:** {{ .Annotations.summary }}
+                **Description:** {{ .Annotations.description }}
+                **Runbook:** {{ .Annotations.runbook_url }}
+                **Time:** {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+                {{ end }}
+          # Slack integration for critical alerts
+          slack_configs:
+            - api_url: 'YOUR_SLACK_WEBHOOK_URL'
+              channel: '#alerts-critical'
+              title: 'Critical Alert in {{ .GroupLabels.namespace }}'
+              text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        
+        - name: 'warning'
+          email_configs:
+            - to: 'platform-team@yourdomain.com'
+              subject: '[WARNING] {{ .GroupLabels.alertname }}'
+  
+  # Grafana configuration
+  grafana:
+    enabled: true
+    
+    # Admin configuration
+    adminUser: admin
+    adminPassword: "your-secure-admin-password"  # Change this!
+    
+    # Persistence configuration
+    persistence:
+      enabled: true
+      type: pvc
+      storageClassName: "ha-gen-lh" 
+      accessModes:
+        - ReadWriteOnce
+      size: 20Gi
+      finalizers:
+        - kubernetes.io/pvc-protection
+    
+    # Resource allocation
+    resources:
+      requests:
+        memory: 512Mi
+        cpu: 200m
+      limits:
+        memory: 1Gi
+        cpu: 500m
+    
+    # Ingress configuration
+    ingress:
+      enabled: true
+      ingressClassName: "nginx"
+      annotations:
+        nginx.ingress.kubernetes.io/ssl-redirect: "true"
+        cert-manager.io/cluster-issuer: "letsencrypt-prod"
+      hosts:
+        - grafana.yourdomain.com
+      tls:
+        - secretName: grafana-tls
+          hosts:
+            - grafana.yourdomain.com
+    
+    # Node selection
+    nodeSelector:
+      node-role: monitoring
+    
+    # Tolerations
+    tolerations:
+      - key: "monitoring"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+    
+    # Grafana configuration
+    grafana.ini:
+      server:
+        domain: grafana.yourdomain.com
+        root_url: "https://grafana.yourdomain.com"
+      
+      security:
+        admin_user: admin
+        admin_password: "your-secure-admin-password"
+        secret_key: "your-secret-key"
+      
+      users:
+        allow_sign_up: false
+        auto_assign_org: true
+        auto_assign_org_role: Viewer
+      
+      auth:
+        disable_login_form: false
+        disable_signout_menu: false
+      
+      smtp:
+        enabled: true
+        host: smtp.yourdomain.com:587
+        user: grafana@yourdomain.com
+        password: your-smtp-password
+        from_address: grafana@yourdomain.com
+        from_name: Grafana
+        startTLS_policy: MandatoryStartTLS
+    
+    # Dashboard configuration
+    defaultDashboardsEnabled: true
+    defaultDashboardsTimezone: "UTC"
+    defaultDashboardsEditable: false
+    
+    # Sidecar configuration for dashboards
+    sidecar:
+      dashboards:
+        enabled: true
+        label: grafana_dashboard
+        labelValue: "1"
+        searchNamespace: ALL
+        folderAnnotation: grafana_folder
+        provider:
+          allowUiUpdates: false
+          disableDelete: true
+      
+      datasources:
+        enabled: true
+        defaultDatasourceEnabled: true
+        label: grafana_datasource
+        labelValue: "1"
+    
+    # Service account configuration
+    serviceAccount:
+      create: true
+      autoMount: true
+    
+    # Security context 
+    securityContext:
+      runAsGroup: 472
+      runAsUser: 472
+      runAsNonRoot: true
+      fsGroup: 472
+  
+  # Default rules configuration
+  defaultRules:
+    create: true
+    rules:
+      # Enable all rule groups for production
+      alertmanager: true
+      etcd: true
+      configReloaders: true
+      general: true
+      k8sContainerCpuUsageSecondsTotal: true
+      k8sContainerMemoryCache: true
+      k8sContainerMemoryRss: true
+      k8sContainerMemorySwap: true
+      k8sContainerResource: true
+      k8sContainerMemoryWorkingSetBytes: true
+      k8sPodOwner: true
+      kubeApiserverAvailability: true
+      kubeApiserverBurnrate: true
+      kubeApiserverHistogram: true
+      kubeApiserverSlos: true
+      kubeControllerManager: true
+      kubelet: true
+      kubeProxy: true
+      kubePrometheusGeneral: true
+      kubePrometheusNodeRecording: true
+      kubernetesApps: true
+      kubernetesResources: true
+      kubernetesStorage: true
+      kubernetesSystem: true
+      kubeSchedulerAlerting: true
+      kubeSchedulerRecording: true
+      kubeStateMetrics: true
+      network: true
+      node: true
+      nodeExporterAlerting: true
+      nodeExporterRecording: true
+      prometheus: true
+      prometheusOperator: true
+      windows: false
+    
+    # Additional labels for all rules
+    additionalRuleLabels:
+      environment: production
+      team: platform
+    
+    # Rule group specific labels
+    additionalRuleGroupLabels:
+      prometheus:
+        priority: high
+      alertmanager:
+        priority: high
+      node:
+        priority: medium
+  
+  # Node Exporter configuration
+  nodeExporter:
+    enabled: true
+    
+    # Tolerations to run on all nodes
+    tolerations:
+      - operator: Exists
+    
+    # Host network for accurate metrics
+    hostNetwork: true
+    hostPID: true
+    
+    # Service configuration
+    service:
+      port: 9100
+      targetPort: 9100
+    
+    # ServiceMonitor configuration
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+  
+  # Kube State Metrics configuration
+  kubeStateMetrics:
+    enabled: true
+    
+    # Resource allocation
+    resources:
+      requests:
+        memory: 256Mi
+        cpu: 100m
+      limits:
+        memory: 512Mi
+        cpu: 200m
+    
+    # Node selection
+    nodeSelector:
+      node-role: monitoring
+    
+    # Tolerations
+    tolerations:
+      - key: "monitoring"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+  
+  # Prometheus Operator configuration
+  prometheusOperator:
+    enabled: true
+    
+    # Resource allocation
+    resources:
+      requests:
+        memory: 256Mi
+        cpu: 200m
+      limits:
+        memory: 512Mi
+        cpu: 500m
+    
+    # Node selection
+    nodeSelector:
+      node-role: monitoring
+    
+    # Tolerations  
+    tolerations:
+      - key: "monitoring"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+    
+    # Security context
+    securityContext:
+      runAsGroup: 65534
+      runAsNonRoot: true
+      runAsUser: 65534
+    
+    # Service account
+    serviceAccount:
+      create: true
+  
+  # Global RBAC
+  global:
+    rbac:
+      create: true
+      createAggregateClusterRoles: false
+  
+  # Additional custom rules for production monitoring
+  additionalPrometheusRulesMap:
+    production-rules:
+      groups:
+        - name: production.rules
+          rules:
+            - alert: HighDiskUsage
+              expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) * 100 < 10
+              for: 5m
+              labels:
+                severity: critical
+              annotations:
+                summary: "High disk usage on {{ $labels.instance }}"
+                description: "Disk usage is above 90% on {{ $labels.instance }}"
+                runbook_url: "https://runbooks.yourdomain.com/high-disk-usage"
+            
+            - alert: HighMemoryUsage
+              expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 90
+              for: 10m
+              labels:
+                severity: warning
+              annotations:
+                summary: "High memory usage on {{ $labels.instance }}"
+                description: "Memory usage is above 90% for 10 minutes on {{ $labels.instance }}"
+            
+            - alert: PodCrashLooping
+              expr: rate(kube_pod_container_status_restarts_total[15m]) > 0
+              for: 5m
+              labels:
+                severity: warning
+              annotations:
+                summary: "Pod {{ $labels.pod }} is crash looping"
+                description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} is restarting frequently"
